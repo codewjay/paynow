@@ -1,0 +1,868 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>PayNow — Expense splitter for students</title>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  html, body {
+    margin: 0;
+    min-height: 100%;
+    background: #f0eee9;
+    font-family: 'Manrope', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    box-sizing: border-box;
+  }
+  @keyframes pn-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.55; transform: scale(0.92); }
+  }
+  @keyframes pn-pop {
+    0% { transform: scale(0.4); opacity: 0; }
+    60% { transform: scale(1.08); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+  .pn-phone *::-webkit-scrollbar { display: none; }
+  .pn-phone * { scrollbar-width: none; }
+
+  /* Fill-screen on small viewports — drop the phone frame */
+  @media (max-width: 480px) {
+    body { padding: 0; align-items: stretch; }
+    .pn-phone {
+      width: 100vw !important;
+      height: 100vh !important;
+      border-radius: 0 !important;
+      border: none !important;
+      box-shadow: none !important;
+    }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin></script>
+
+<script type="text/babel" data-presets="react">
+// ── Design tokens ──────────────────────────────────────────────────
+const T = {
+  primary: 'oklch(0.52 0.14 280)',
+  primaryHover: 'oklch(0.48 0.14 280)',
+  primaryContainer: 'oklch(0.93 0.04 280)',
+  onPrimaryContainer: 'oklch(0.32 0.12 280)',
+  surface: '#FAFAF7',
+  surfaceCard: '#FFFFFF',
+  surfaceVariant: '#F2F1ED',
+  outline: 'rgba(38, 32, 54, 0.10)',
+  outlineSoft: 'rgba(38, 32, 54, 0.06)',
+  onSurface: '#1B1A22',
+  onSurfaceMuted: '#5A5867',
+  onSurfaceFaint: '#8E8C99',
+  greenBg: 'oklch(0.94 0.04 150)',
+  greenText: 'oklch(0.42 0.10 150)',
+  greenDot: 'oklch(0.58 0.12 150)',
+  redBg: 'oklch(0.94 0.035 25)',
+  redText: 'oklch(0.48 0.13 25)',
+  redDot: 'oklch(0.62 0.16 25)',
+  amberBg: 'oklch(0.94 0.05 80)',
+  amberText: 'oklch(0.48 0.13 75)',
+  amberDot: 'oklch(0.7 0.14 75)',
+  font: '"Manrope", -apple-system, system-ui, sans-serif',
+};
+
+// ── Avatars ────────────────────────────────────────────────────────
+const AVATAR_HUES = [12, 45, 95, 150, 200, 240, 280, 320];
+function avatarStyle(name, size = 40) {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  const hue = AVATAR_HUES[h % AVATAR_HUES.length];
+  return {
+    width: size, height: size, borderRadius: '50%',
+    background: `oklch(0.88 0.06 ${hue})`,
+    color: `oklch(0.32 0.12 ${hue})`,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    fontWeight: 700, fontSize: size * 0.42,
+    flexShrink: 0, userSelect: 'none',
+  };
+}
+function Avatar({ name, size = 40 }) {
+  const initials = name.split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase();
+  return <div style={avatarStyle(name, size)}>{initials}</div>;
+}
+
+// ── Icons (outlined, 1.75 stroke) ─────────────────────────────────
+function Icon({ d, size = 24, color = 'currentColor', stroke = 1.75, fill }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill={fill || 'none'}
+         stroke={fill ? 'none' : color} strokeWidth={stroke}
+         strokeLinecap="round" strokeLinejoin="round">
+      {typeof d === 'string' ? <path d={d}/> : d}
+    </svg>
+  );
+}
+const ICONS = {
+  home: 'M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-7h-6v7H4a1 1 0 0 1-1-1z',
+  groups: <><circle cx="9" cy="9" r="3.2"/><circle cx="17" cy="10" r="2.4"/><path d="M3 19c.5-3 3-4.5 6-4.5s5.5 1.5 6 4.5"/><path d="M15 14.5c2.5 0 4.5 1.2 5 4"/></>,
+  activity: <><path d="M3 12h4l2-7 4 14 2-7h6"/></>,
+  plus: <><path d="M12 5v14"/><path d="M5 12h14"/></>,
+  back: <><path d="M15 6l-6 6 6 6"/></>,
+  close: <><path d="M6 6l12 12"/><path d="M18 6l-12 12"/></>,
+  check: <><path d="M5 12l5 5L20 7"/></>,
+  search: <><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></>,
+  more: <><circle cx="5" cy="12" r="1.4" fill="currentColor"/><circle cx="12" cy="12" r="1.4" fill="currentColor"/><circle cx="19" cy="12" r="1.4" fill="currentColor"/></>,
+  arrow: <><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></>,
+  filter: <><path d="M4 6h16"/><path d="M7 12h10"/><path d="M10 18h4"/></>,
+};
+
+// ── Common chrome ──────────────────────────────────────────────────
+function StatusBar() {
+  return (
+    <div style={{
+      height: 36, padding: '0 22px', display: 'flex',
+      alignItems: 'center', justifyContent: 'space-between',
+      fontFamily: T.font, fontSize: 14, fontWeight: 600, color: T.onSurface,
+      flexShrink: 0,
+    }}>
+      <span>9:30</span>
+      <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
+        <svg width="16" height="11" viewBox="0 0 16 11" fill="none">
+          <path d="M8 9.5L1.5 3.5a9 9 0 0 1 13 0L8 9.5z" fill={T.onSurface}/>
+        </svg>
+        <svg width="16" height="11" viewBox="0 0 16 11">
+          <rect x="0" y="6" width="3" height="5" rx="0.5" fill={T.onSurface}/>
+          <rect x="4.5" y="3.5" width="3" height="7.5" rx="0.5" fill={T.onSurface}/>
+          <rect x="9" y="1" width="3" height="10" rx="0.5" fill={T.onSurface}/>
+          <rect x="13.5" y="0" width="3" height="11" rx="0.5" fill={T.onSurface} opacity="0.35"/>
+        </svg>
+        <svg width="22" height="11" viewBox="0 0 22 11" fill="none">
+          <rect x="0.5" y="0.5" width="19" height="10" rx="2.5" stroke={T.onSurface}/>
+          <rect x="2" y="2" width="13" height="7" rx="1" fill={T.onSurface}/>
+          <rect x="20.5" y="3.5" width="1.5" height="4" rx="0.5" fill={T.onSurface}/>
+        </svg>
+      </div>
+    </div>
+  );
+}
+
+function GestureBar() {
+  return (
+    <div style={{ height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+      <div style={{ width: 108, height: 4, borderRadius: 2, background: T.onSurface, opacity: 0.4 }} />
+    </div>
+  );
+}
+
+function BottomNav({ active = 'home', onChange }) {
+  const items = [
+    { id: 'home', label: 'Home', icon: ICONS.home },
+    { id: 'groups', label: 'Groups', icon: ICONS.groups },
+    { id: 'activity', label: 'Activity', icon: ICONS.activity },
+  ];
+  return (
+    <div style={{
+      display: 'flex', justifyContent: 'space-around', padding: '6px 12px 10px',
+      background: T.surface, borderTop: `1px solid ${T.outlineSoft}`, flexShrink: 0,
+    }}>
+      {items.map(it => {
+        const sel = it.id === active;
+        return (
+          <button key={it.id} onClick={() => onChange && onChange(it.id)}
+            style={{
+              flex: 1, background: 'none', border: 'none', cursor: 'pointer',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+              padding: '6px 0', fontFamily: T.font,
+            }}>
+            <div style={{
+              width: 56, height: 30, borderRadius: 16,
+              background: sel ? T.primaryContainer : 'transparent',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: sel ? T.onPrimaryContainer : T.onSurfaceMuted,
+              transition: 'background 0.2s',
+            }}>
+              <Icon d={it.icon} size={22} stroke={sel ? 2 : 1.75}/>
+            </div>
+            <span style={{
+              fontSize: 11.5, fontWeight: sel ? 700 : 500,
+              color: sel ? T.onSurface : T.onSurfaceMuted, letterSpacing: 0.1,
+            }}>{it.label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function FAB({ onClick, label = 'Add expense' }) {
+  return (
+    <button onClick={onClick} style={{
+      position: 'absolute', right: 16, bottom: 96, zIndex: 5,
+      height: 56, padding: '0 20px 0 16px', display: 'flex',
+      alignItems: 'center', gap: 8, borderRadius: 18,
+      background: T.primary, color: '#fff', border: 'none', cursor: 'pointer',
+      boxShadow: '0 6px 16px rgba(60, 50, 140, 0.28), 0 2px 4px rgba(60, 50, 140, 0.12)',
+      fontFamily: T.font, fontSize: 15, fontWeight: 600, letterSpacing: 0.1,
+    }}>
+      <Icon d={ICONS.plus} size={22} stroke={2.2}/>
+      <span>{label}</span>
+    </button>
+  );
+}
+
+function Rupee({ amount, size = 28, color = T.onSurface, weight = 700 }) {
+  return (
+    <span style={{ fontFamily: T.font, fontWeight: weight, color, fontSize: size, letterSpacing: -0.5, fontVariantNumeric: 'tabular-nums' }}>
+      <span style={{ fontWeight: 500, marginRight: 1 }}>₹</span>{amount.toLocaleString('en-IN')}
+    </span>
+  );
+}
+
+function Chip({ tone = 'neutral', children, pulse }) {
+  const map = {
+    green: { bg: T.greenBg, fg: T.greenText, dot: T.greenDot },
+    red: { bg: T.redBg, fg: T.redText, dot: T.redDot },
+    amber: { bg: T.amberBg, fg: T.amberText, dot: T.amberDot },
+    neutral: { bg: T.surfaceVariant, fg: T.onSurfaceMuted, dot: T.onSurfaceFaint },
+  };
+  const c = map[tone];
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 6,
+      background: c.bg, color: c.fg, borderRadius: 999,
+      padding: '6px 12px', fontFamily: T.font, fontSize: 12.5, fontWeight: 600,
+      letterSpacing: 0.1, whiteSpace: 'nowrap',
+    }}>
+      {pulse && (
+        <span style={{
+          width: 8, height: 8, borderRadius: '50%', background: c.dot,
+          animation: 'pn-pulse 1.4s ease-in-out infinite',
+        }}/>
+      )}
+      {children}
+    </span>
+  );
+}
+
+// ── Data ───────────────────────────────────────────────────────────
+const GROUPS = [
+  { id: 'hostel', name: 'Hostel Room 4', members: ['Arjun', 'Priya', 'Rahul'], net: 850, emoji: null },
+  { id: 'cse', name: 'CSE Batch 2023', members: ['Sneha', 'Arjun', 'Rahul', 'Priya', 'Karan'], net: 280, emoji: null },
+  { id: 'goa', name: 'Goa Trip', members: ['Priya', 'Arjun', 'Sneha'], net: -320, emoji: '🏖️' },
+  { id: 'chai', name: 'Chai Gang', members: ['Rahul', 'Sneha'], net: 320, emoji: '☕' },
+];
+
+const EXPENSES = [
+  { id: 1, title: "Domino's split", emoji: '🍕', by: 'Priya', total: 880, you: 220, date: 'Today' },
+  { id: 2, title: 'Auto to college', emoji: '🛺', by: 'You', total: 80, you: 27, date: 'Today' },
+  { id: 3, title: 'Canteen lunch', emoji: '🍛', by: 'Arjun', total: 360, you: 90, date: 'Yesterday' },
+  { id: 4, title: 'Sem notes printout', emoji: '📚', by: 'You', total: 240, you: 60, date: 'Mon' },
+  { id: 5, title: 'Birthday cake — Sneha', emoji: '🎂', by: 'Rahul', total: 650, you: 130, date: 'Sun' },
+];
+
+const BALANCES = [
+  { name: 'Arjun', amount: 350, dir: 'owes' },
+  { name: 'Rahul', amount: 200, dir: 'owes' },
+  { name: 'Priya', amount: 200, dir: 'youOwe' },
+];
+
+// ── Screen 1 — Home / Dashboard ────────────────────────────────────
+function HomeScreen({ goTo }) {
+  return (
+    <>
+      <StatusBar/>
+      <div style={{ flex: 1, overflow: 'auto', position: 'relative', background: T.surface }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 20px 0' }}>
+          <div style={{ width: 40, height: 40, borderRadius: 12, background: T.surfaceCard, border: `1px solid ${T.outlineSoft}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.onSurfaceMuted }}>
+            <Icon d={ICONS.search} size={20}/>
+          </div>
+          <Avatar name="Jay" size={40}/>
+        </div>
+
+        <div style={{ padding: '20px 20px 8px' }}>
+          <div style={{ fontFamily: T.font, fontSize: 28, fontWeight: 700, color: T.onSurface, letterSpacing: -0.6, lineHeight: 1.15 }}>
+            Hey Jay <span style={{ display: 'inline-block', transform: 'rotate(-6deg)' }}>👋</span>
+          </div>
+          <div style={{ fontFamily: T.font, fontSize: 15.5, color: T.onSurfaceMuted, marginTop: 4, letterSpacing: 0.1 }}>
+            Here's where things stand
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, padding: '12px 16px 4px' }}>
+          <div style={{
+            background: T.greenBg, borderRadius: 24, padding: '16px 16px 18px',
+            display: 'flex', flexDirection: 'column', gap: 10, minHeight: 124,
+          }}>
+            <div style={{ fontFamily: T.font, fontSize: 12.5, fontWeight: 600, color: T.greenText, letterSpacing: 0.2, textTransform: 'uppercase' }}>
+              You're owed
+            </div>
+            <Rupee amount={1450} size={32} color={T.greenText} weight={700}/>
+            <div style={{ fontFamily: T.font, fontSize: 12.5, color: T.greenText, opacity: 0.75 }}>
+              across 2 friends
+            </div>
+          </div>
+          <div style={{
+            background: T.redBg, borderRadius: 24, padding: '16px 16px 18px',
+            display: 'flex', flexDirection: 'column', gap: 10, minHeight: 124,
+          }}>
+            <div style={{ fontFamily: T.font, fontSize: 12.5, fontWeight: 600, color: T.redText, letterSpacing: 0.2, textTransform: 'uppercase' }}>
+              You owe
+            </div>
+            <Rupee amount={320} size={32} color={T.redText} weight={700}/>
+            <div style={{ fontFamily: T.font, fontSize: 12.5, color: T.redText, opacity: 0.75 }}>
+              to Priya
+            </div>
+          </div>
+        </div>
+
+        <div style={{ padding: '24px 20px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+          <span style={{ fontFamily: T.font, fontSize: 17, fontWeight: 700, color: T.onSurface, letterSpacing: -0.1 }}>
+            Your groups
+          </span>
+          <span style={{ fontFamily: T.font, fontSize: 13, fontWeight: 600, color: T.primary }}>See all</span>
+        </div>
+
+        <div style={{ padding: '0 12px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {GROUPS.map(g => (
+            <button key={g.id} onClick={() => goTo('group', { groupId: g.id })}
+              style={{
+                background: 'transparent', border: 'none', cursor: 'pointer',
+                padding: '12px 12px', borderRadius: 18, textAlign: 'left',
+                display: 'flex', alignItems: 'center', gap: 12,
+                fontFamily: T.font,
+              }}>
+              <div style={{ display: 'flex', position: 'relative', width: 52, height: 40 }}>
+                {g.members.slice(0, 3).map((m, i) => (
+                  <div key={m+i} style={{
+                    position: 'absolute', left: i * 12, top: 0,
+                    border: `2px solid ${T.surface}`, borderRadius: '50%',
+                  }}>
+                    <Avatar name={m} size={32}/>
+                  </div>
+                ))}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 15.5, fontWeight: 600, color: T.onSurface }}>{g.name}</span>
+                  {g.emoji && <span style={{ fontSize: 14 }}>{g.emoji}</span>}
+                </div>
+                <div style={{ fontSize: 12.5, color: T.onSurfaceFaint, marginTop: 2 }}>
+                  {g.members.length} members
+                </div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{
+                  fontSize: 14.5, fontWeight: 700, fontVariantNumeric: 'tabular-nums',
+                  color: g.net >= 0 ? T.greenText : T.redText,
+                }}>
+                  {g.net >= 0 ? '+' : '−'}₹{Math.abs(g.net)}
+                </div>
+                <div style={{ fontSize: 11, color: T.onSurfaceFaint, marginTop: 1 }}>
+                  {g.net >= 0 ? 'owed to you' : 'you owe'}
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+
+        <div style={{ height: 110 }}/>
+        <FAB onClick={() => goTo('add')}/>
+      </div>
+      <BottomNav active="home" onChange={() => {}}/>
+      <GestureBar/>
+    </>
+  );
+}
+
+// ── Screen 2 — Group detail ────────────────────────────────────────
+function GroupScreen({ goTo }) {
+  return (
+    <>
+      <StatusBar/>
+      <div style={{ flex: 1, overflow: 'auto', background: T.surface, position: 'relative' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 8px 0' }}>
+          <button onClick={() => goTo('home')} style={{
+            width: 44, height: 44, borderRadius: 22, background: 'transparent', border: 'none',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.onSurface, cursor: 'pointer',
+          }}>
+            <Icon d={ICONS.back} size={22}/>
+          </button>
+          <button style={{
+            width: 44, height: 44, borderRadius: 22, background: 'transparent', border: 'none',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.onSurface, cursor: 'pointer',
+          }}>
+            <Icon d={ICONS.more} size={22}/>
+          </button>
+        </div>
+
+        <div style={{ padding: '8px 22px 0' }}>
+          <div style={{ fontFamily: T.font, fontSize: 32, fontWeight: 700, color: T.onSurface, letterSpacing: -0.7, lineHeight: 1.1 }}>
+            Hostel Room 4
+          </div>
+          <div style={{ fontFamily: T.font, fontSize: 13.5, color: T.onSurfaceMuted, marginTop: 6 }}>
+            4 members · Created Aug 2024
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: 18, padding: '20px 22px 4px', overflowX: 'auto' }}>
+          {[{ name: 'Jay', tag: 'You' }, { name: 'Arjun' }, { name: 'Priya' }, { name: 'Rahul' }].map(m => (
+            <div key={m.name} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+              <Avatar name={m.name} size={52}/>
+              <span style={{ fontFamily: T.font, fontSize: 12.5, fontWeight: 600, color: T.onSurface }}>
+                {m.tag || m.name}
+              </span>
+            </div>
+          ))}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+            <div style={{
+              width: 52, height: 52, borderRadius: 26,
+              background: T.surfaceCard, border: `1.5px dashed ${T.outline}`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.onSurfaceMuted,
+            }}>
+              <Icon d={ICONS.plus} size={22}/>
+            </div>
+            <span style={{ fontFamily: T.font, fontSize: 12, color: T.onSurfaceFaint }}>Invite</span>
+          </div>
+        </div>
+
+        <div style={{ padding: '16px 22px 4px', display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          {BALANCES.map(b => (
+            <Chip key={b.name} tone={b.dir === 'owes' ? 'green' : 'red'}>
+              {b.dir === 'owes' ? `${b.name} owes you ₹${b.amount}` : `You owe ${b.name} ₹${b.amount}`}
+            </Chip>
+          ))}
+        </div>
+
+        <div style={{ padding: '20px 22px 4px', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+          <span style={{ fontFamily: T.font, fontSize: 15, fontWeight: 700, color: T.onSurface }}>Recent expenses</span>
+          <button style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, color: T.onSurfaceMuted, fontFamily: T.font, fontSize: 13 }}>
+            <Icon d={ICONS.filter} size={16}/> Filter
+          </button>
+        </div>
+
+        <div style={{ padding: '4px 12px 24px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {EXPENSES.map(e => (
+            <div key={e.id} style={{
+              padding: '12px 12px', display: 'flex', alignItems: 'center', gap: 14,
+              borderRadius: 16, fontFamily: T.font,
+            }}>
+              <div style={{
+                width: 44, height: 44, borderRadius: 14, background: T.surfaceCard,
+                border: `1px solid ${T.outlineSoft}`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22,
+              }}>
+                {e.emoji}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 15, fontWeight: 600, color: T.onSurface }}>{e.title}</div>
+                <div style={{ fontSize: 12.5, color: T.onSurfaceFaint, marginTop: 2 }}>
+                  {e.by === 'You' ? 'You paid' : `${e.by} paid`} · {e.date}
+                </div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{
+                  fontSize: 14, fontWeight: 700, color: e.by === 'You' ? T.greenText : T.redText,
+                  fontVariantNumeric: 'tabular-nums',
+                }}>
+                  {e.by === 'You' ? `+₹${e.total - e.you}` : `−₹${e.you}`}
+                </div>
+                <div style={{ fontSize: 11, color: T.onSurfaceFaint }}>
+                  ₹{e.total} total
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div style={{ height: 96 }}/>
+      </div>
+
+      <div style={{
+        padding: '12px 16px 16px', background: T.surface,
+        borderTop: `1px solid ${T.outlineSoft}`,
+      }}>
+        <button onClick={() => goTo('settle', { person: 'Priya', amount: 350 })} style={{
+          width: '100%', height: 56, borderRadius: 18,
+          background: T.primary, color: '#fff', border: 'none', cursor: 'pointer',
+          fontFamily: T.font, fontSize: 16, fontWeight: 700, letterSpacing: 0.1,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+        }}>
+          Settle up
+          <Icon d={ICONS.arrow} size={18} stroke={2.2}/>
+        </button>
+      </div>
+      <GestureBar/>
+    </>
+  );
+}
+
+// ── Screen 3 — Settle Up (3 states) ────────────────────────────────
+function SettleScreen({ goTo, state = 'pay', setState }) {
+  const isPay = state === 'pay';
+  const isPending = state === 'pending';
+  const isConfirmed = state === 'confirmed';
+
+  return (
+    <>
+      <StatusBar/>
+      <div style={{ flex: 1, overflow: 'auto', background: T.surface, display: 'flex', flexDirection: 'column' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 8px 0' }}>
+          <button onClick={() => goTo('group')} style={{
+            width: 44, height: 44, borderRadius: 22, background: 'transparent', border: 'none',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.onSurface, cursor: 'pointer',
+          }}>
+            <Icon d={ICONS.close} size={22}/>
+          </button>
+        </div>
+
+        <div style={{
+          flex: 1, display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center', padding: '0 28px',
+          textAlign: 'center', gap: 0,
+        }}>
+          {isConfirmed && (
+            <>
+              <div style={{
+                width: 96, height: 96, borderRadius: '50%', background: T.greenBg,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 24,
+                animation: 'pn-pop 400ms cubic-bezier(.2,.7,.3,1.2)',
+              }}>
+                <div style={{ color: T.greenText }}>
+                  <Icon d={ICONS.check} size={48} stroke={2.6}/>
+                </div>
+              </div>
+              <div style={{ fontFamily: T.font, fontSize: 23, fontWeight: 700, color: T.onSurface, letterSpacing: -0.4, lineHeight: 1.25 }}>
+                Priya confirmed<br/>₹350 received
+              </div>
+              <div style={{ fontFamily: T.font, fontSize: 14.5, color: T.onSurfaceMuted, marginTop: 12, maxWidth: 280 }}>
+                You're all settled with Priya in Hostel Room 4.
+              </div>
+            </>
+          )}
+
+          {!isConfirmed && (
+            <>
+              <div style={{ opacity: isPending ? 0.55 : 1, transition: 'opacity 0.3s' }}>
+                <Avatar name="Priya" size={88}/>
+              </div>
+              <div style={{ fontFamily: T.font, fontSize: 18, fontWeight: 600, color: T.onSurface, marginTop: 16, letterSpacing: -0.2 }}>
+                Priya
+              </div>
+              <div style={{
+                fontFamily: T.font, fontSize: 56, fontWeight: 700,
+                color: isPending ? T.onSurfaceFaint : T.onSurface,
+                letterSpacing: -2, marginTop: 14, transition: 'color 0.3s',
+                fontVariantNumeric: 'tabular-nums',
+              }}>
+                <span style={{ fontWeight: 500, marginRight: 2 }}>₹</span>350
+              </div>
+              <div style={{ fontFamily: T.font, fontSize: 14.5, color: T.onSurfaceMuted, marginTop: 8, maxWidth: 280, lineHeight: 1.45 }}>
+                For Canteen + Auto fare this week
+              </div>
+
+              {isPending && (
+                <div style={{ marginTop: 28 }}>
+                  <Chip tone="amber" pulse>Waiting for Priya to confirm receipt…</Chip>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        <div style={{ padding: '0 20px 16px' }}>
+          {isPay && (
+            <>
+              <button onClick={() => setState('pending')} style={{
+                width: '100%', height: 56, borderRadius: 18,
+                background: T.primary, color: '#fff', border: 'none', cursor: 'pointer',
+                fontFamily: T.font, fontSize: 16, fontWeight: 700, letterSpacing: 0.1,
+              }}>
+                Open UPI app
+              </button>
+              <div style={{ fontFamily: T.font, fontSize: 11.5, color: T.onSurfaceFaint, textAlign: 'center', marginTop: 12, lineHeight: 1.5, padding: '0 12px' }}>
+                PayNow doesn't handle your money — you pay directly via GPay or PhonePe.
+              </div>
+            </>
+          )}
+          {isPending && (
+            <>
+              <button style={{
+                width: '100%', height: 56, borderRadius: 18,
+                background: T.surfaceCard, color: T.onSurface, border: `1px solid ${T.outline}`, cursor: 'pointer',
+                fontFamily: T.font, fontSize: 15.5, fontWeight: 600,
+              }}>
+                Send Priya a nudge
+              </button>
+              <div style={{ fontFamily: T.font, fontSize: 11.5, color: T.onSurfaceFaint, textAlign: 'center', marginTop: 12 }}>
+                Priya will get a notification to confirm.
+              </div>
+              <button onClick={() => setState('confirmed')} style={{
+                marginTop: 8, width: '100%', height: 32, borderRadius: 10,
+                background: 'transparent', color: T.onSurfaceFaint, border: `1px dashed ${T.outlineSoft}`,
+                fontFamily: T.font, fontSize: 11, cursor: 'pointer',
+              }}>
+                [demo] simulate confirmation →
+              </button>
+            </>
+          )}
+          {isConfirmed && (
+            <button onClick={() => { setState('pay'); goTo('group'); }} style={{
+              width: '100%', height: 56, borderRadius: 18,
+              background: T.primary, color: '#fff', border: 'none', cursor: 'pointer',
+              fontFamily: T.font, fontSize: 16, fontWeight: 700, letterSpacing: 0.1,
+            }}>
+              Done
+            </button>
+          )}
+        </div>
+      </div>
+      <GestureBar/>
+    </>
+  );
+}
+
+// ── Screen 4 — Add expense ─────────────────────────────────────────
+const CATEGORIES = [
+  { emoji: '🍛', label: 'Canteen' },
+  { emoji: '☕', label: 'Chai' },
+  { emoji: '🏠', label: 'Hostel' },
+  { emoji: '⛽', label: 'Petrol' },
+  { emoji: '📚', label: 'Notes' },
+  { emoji: '🎮', label: 'Gaming' },
+  { emoji: '✈️', label: 'Trip' },
+  { emoji: '🎂', label: 'Birthday' },
+];
+const MEMBERS = ['Jay', 'Arjun', 'Priya', 'Rahul'];
+
+function SectionLabel({ children }) {
+  return (
+    <div style={{
+      padding: '18px 22px 6px', fontFamily: T.font, fontSize: 12.5, fontWeight: 700,
+      color: T.onSurfaceFaint, letterSpacing: 0.6, textTransform: 'uppercase',
+    }}>{children}</div>
+  );
+}
+
+function AddExpenseScreen({ goTo }) {
+  const [amount, setAmount] = React.useState('480');
+  const [title, setTitle] = React.useState("Domino's split");
+  const [paidBy, setPaidBy] = React.useState('Jay');
+  const [category, setCategory] = React.useState('Canteen');
+  const [splitType, setSplitType] = React.useState('Equal');
+  const [included, setIncluded] = React.useState({ Jay: true, Arjun: true, Priya: true, Rahul: true });
+
+  const includedNames = MEMBERS.filter(m => included[m]);
+  const perPerson = amount && includedNames.length > 0
+    ? Math.round((Number(amount) / includedNames.length) * 100) / 100 : 0;
+
+  return (
+    <>
+      <StatusBar/>
+      <div style={{ flex: 1, overflow: 'auto', background: T.surface, display: 'flex', flexDirection: 'column' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 8px 0' }}>
+          <button onClick={() => goTo('home')} style={{
+            width: 44, height: 44, borderRadius: 22, background: 'transparent', border: 'none',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.onSurface, cursor: 'pointer',
+          }}>
+            <Icon d={ICONS.close} size={22}/>
+          </button>
+          <span style={{ fontFamily: T.font, fontSize: 15, fontWeight: 600, color: T.onSurface }}>New expense</span>
+          <div style={{ width: 44 }}/>
+        </div>
+
+        <div style={{
+          padding: '32px 24px 28px', display: 'flex', flexDirection: 'column',
+          alignItems: 'center', gap: 8,
+        }}>
+          <div style={{ fontFamily: T.font, fontSize: 12.5, fontWeight: 600, color: T.onSurfaceFaint, letterSpacing: 0.4, textTransform: 'uppercase' }}>
+            Amount
+          </div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+            <span style={{ fontFamily: T.font, fontSize: 40, color: T.onSurfaceMuted, fontWeight: 500 }}>₹</span>
+            <input
+              type="text" inputMode="decimal" value={amount}
+              onChange={e => setAmount(e.target.value.replace(/[^\d.]/g, ''))}
+              style={{
+                width: 180, border: 'none', outline: 'none', background: 'transparent',
+                fontFamily: T.font, fontSize: 64, fontWeight: 700, color: T.onSurface,
+                letterSpacing: -2.5, textAlign: 'center',
+                fontVariantNumeric: 'tabular-nums', padding: 0,
+              }}
+            />
+          </div>
+          <div style={{
+            width: 80, height: 2, borderRadius: 1, background: T.primary, opacity: 0.6, marginTop: -4,
+          }}/>
+        </div>
+
+        <div style={{ padding: '0 20px 16px' }}>
+          <input
+            value={title} onChange={e => setTitle(e.target.value)}
+            placeholder="What's this for?"
+            style={{
+              width: '100%', height: 56, borderRadius: 16,
+              background: T.surfaceCard, border: `1px solid ${T.outlineSoft}`,
+              padding: '0 18px', fontFamily: T.font, fontSize: 15.5,
+              color: T.onSurface, outline: 'none', boxSizing: 'border-box',
+            }}
+          />
+        </div>
+
+        <SectionLabel>Paid by</SectionLabel>
+        <div style={{ display: 'flex', gap: 12, padding: '4px 20px 4px', overflowX: 'auto' }}>
+          {MEMBERS.map(m => {
+            const sel = paidBy === m;
+            return (
+              <button key={m} onClick={() => setPaidBy(m)} style={{
+                background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+              }}>
+                <div style={{
+                  position: 'relative', borderRadius: '50%',
+                  padding: 3,
+                  background: sel ? T.primary : 'transparent',
+                  transition: 'background 0.2s',
+                }}>
+                  <div style={{ border: `2px solid ${sel ? T.surface : 'transparent'}`, borderRadius: '50%' }}>
+                    <Avatar name={m} size={48}/>
+                  </div>
+                </div>
+                <span style={{
+                  fontFamily: T.font, fontSize: 12.5,
+                  fontWeight: sel ? 700 : 500,
+                  color: sel ? T.primary : T.onSurfaceMuted,
+                }}>{m === 'Jay' ? 'You' : m}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        <SectionLabel>Category</SectionLabel>
+        <div style={{ display: 'flex', gap: 8, padding: '4px 20px 4px', overflowX: 'auto' }}>
+          {CATEGORIES.map(c => {
+            const sel = category === c.label;
+            return (
+              <button key={c.label} onClick={() => setCategory(c.label)} style={{
+                flexShrink: 0, height: 40, padding: '0 14px',
+                borderRadius: 12, display: 'flex', alignItems: 'center', gap: 6,
+                background: sel ? T.primaryContainer : T.surfaceCard,
+                border: `1px solid ${sel ? 'transparent' : T.outlineSoft}`,
+                fontFamily: T.font, fontSize: 13.5, fontWeight: sel ? 700 : 500,
+                color: sel ? T.onPrimaryContainer : T.onSurface, cursor: 'pointer',
+                transition: 'background 0.15s',
+              }}>
+                <span style={{ fontSize: 16 }}>{c.emoji}</span>
+                {c.label}
+              </button>
+            );
+          })}
+        </div>
+
+        <SectionLabel>Split</SectionLabel>
+        <div style={{ padding: '4px 20px 0' }}>
+          <div style={{
+            display: 'flex', background: T.surfaceVariant, borderRadius: 14, padding: 4, gap: 4,
+          }}>
+            {['Equal', 'Custom', 'Percentage'].map(t => {
+              const sel = splitType === t;
+              return (
+                <button key={t} onClick={() => setSplitType(t)} style={{
+                  flex: 1, height: 38, borderRadius: 10, border: 'none', cursor: 'pointer',
+                  background: sel ? T.surfaceCard : 'transparent',
+                  color: sel ? T.onSurface : T.onSurfaceMuted,
+                  fontFamily: T.font, fontSize: 13.5, fontWeight: sel ? 700 : 500,
+                  boxShadow: sel ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
+                  transition: 'all 0.15s',
+                }}>{t}</button>
+              );
+            })}
+          </div>
+        </div>
+
+        <SectionLabel>Split between</SectionLabel>
+        <div style={{ padding: '4px 12px 4px', display: 'flex', flexDirection: 'column' }}>
+          {MEMBERS.map(m => {
+            const sel = included[m];
+            return (
+              <button key={m} onClick={() => setIncluded({ ...included, [m]: !sel })} style={{
+                display: 'flex', alignItems: 'center', gap: 14, padding: '12px 10px',
+                background: 'transparent', border: 'none', cursor: 'pointer', borderRadius: 14, textAlign: 'left',
+                fontFamily: T.font,
+              }}>
+                <div style={{
+                  width: 22, height: 22, borderRadius: 6,
+                  background: sel ? T.primary : 'transparent',
+                  border: sel ? 'none' : `1.75px solid ${T.outline}`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: '#fff', flexShrink: 0,
+                }}>
+                  {sel && <Icon d={ICONS.check} size={16} stroke={3}/>}
+                </div>
+                <Avatar name={m} size={36}/>
+                <span style={{ flex: 1, fontSize: 15, fontWeight: 600, color: T.onSurface }}>
+                  {m === 'Jay' ? 'You' : m}
+                </span>
+                <span style={{
+                  fontSize: 13.5, color: T.onSurfaceFaint, fontVariantNumeric: 'tabular-nums', fontWeight: 500,
+                }}>
+                  {sel ? `₹${perPerson.toFixed(2).replace(/\.00$/, '')}` : '—'}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div style={{ height: 96 }}/>
+      </div>
+
+      <div style={{ padding: '12px 16px 12px', background: T.surface, borderTop: `1px solid ${T.outlineSoft}` }}>
+        <button onClick={() => goTo('home')} style={{
+          width: '100%', height: 56, borderRadius: 18,
+          background: T.primary, color: '#fff', border: 'none', cursor: 'pointer',
+          fontFamily: T.font, fontSize: 16, fontWeight: 700, letterSpacing: 0.1,
+        }}>
+          Add expense
+        </button>
+      </div>
+      <GestureBar/>
+    </>
+  );
+}
+
+// ── Phone wrapper + entrypoint ─────────────────────────────────────
+function Phone() {
+  const [screen, setScreen] = React.useState('home');
+  const [settleState, setSettleState] = React.useState('pay');
+  const goTo = (s) => {
+    if (s === 'settle') setSettleState('pay');
+    setScreen(s);
+  };
+  return (
+    <div className="pn-phone" style={{
+      width: 380, height: 800, background: T.surface,
+      borderRadius: 44, overflow: 'hidden',
+      display: 'flex', flexDirection: 'column',
+      border: '8px solid #1a1822',
+      boxShadow: '0 24px 60px rgba(20,15,40,0.18), 0 2px 6px rgba(20,15,40,0.08)',
+      fontFamily: T.font, position: 'relative',
+    }}>
+      {screen === 'home' && <HomeScreen goTo={goTo}/>}
+      {screen === 'group' && <GroupScreen goTo={goTo}/>}
+      {screen === 'settle' && <SettleScreen goTo={goTo} state={settleState} setState={setSettleState}/>}
+      {screen === 'add' && <AddExpenseScreen goTo={goTo}/>}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<Phone/>);
+</script>
+</body>
+</html>

@@ -1,0 +1,39 @@
+{
+  "expo": {
+    "name": "PayNow",
+    "slug": "paynow",
+    "version": "1.0.0",
+    "sdkVersion": "54.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "scheme": "paynow",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#FAFAFA"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.paynow.app"
+    },
+    "android": {
+      "package": "com.paynow.app",
+      "googleServicesFile": "./google-services.json",
+      "adaptiveIcon": {
+        "backgroundColor": "#FAFAFA"
+      }
+    },
+    "plugins": [
+      "expo-notifications",
+      "@react-native-firebase/app",
+      "@react-native-firebase/auth"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "dad3c567-3951-406d-a0b1-62aac0add833"
+      }
+    }
+  }
+}

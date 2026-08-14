@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e \"require\\('./routes/settlements'\\); require\\('./routes/expenses'\\); require\\('./config/notifications'\\); console.log\\('ok'\\);\")",
+      "Bash(node *)",
+      "Bash(ipconfig)"
+    ]
+  }
+}
