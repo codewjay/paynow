@@ -15,7 +15,7 @@ export default function ProfileSetupScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  const usernameOk = /^[a-z0-9_.-]{3,20}$/.test(username);
+  const usernameOk = /^[a-z0-9_.-]{3,15}$/.test(username);
   const ready = name.trim().length >= 1 && usernameOk && (!upiId || isValidUPI(upiId.trim()));
 
   const submit = async () => {
@@ -75,7 +75,7 @@ export default function ProfileSetupScreen() {
           <TextInput
             value={username}
             onChangeText={setUsername}
-            placeholder="username (3-20 chars)"
+            placeholder="username (3-15 chars)"
             placeholderTextColor={colors.textMuted}
             style={[fieldStyle, { marginTop: spacing.sm }]}
             autoCapitalize="none"

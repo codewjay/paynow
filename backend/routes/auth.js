@@ -67,7 +67,7 @@ router.post(
   '/complete-profile',
   requireAuth,
   body('name').isString().trim().isLength({ min: 1, max: 60 }).withMessage('Name is required'),
-  body('username').isString().trim().toLowerCase().matches(/^[a-z0-9_.-]{3,20}$/).withMessage('Username must be 3-20 chars (letters, numbers, _, ., -)'),
+  body('username').isString().trim().toLowerCase().matches(/^[a-z0-9_.-]{3,15}$/).withMessage('Username must be 3-15 chars (letters, numbers, _, ., -)'),
   body('upiId')
     .isString()
     .matches(/^[\w.\-]+@[\w]+$/)

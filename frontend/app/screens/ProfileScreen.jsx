@@ -75,11 +75,11 @@ export default function ProfileScreen({ navigation }) {
           <Text style={{ fontSize: 20, fontWeight: '700', color: colors.textPrimary }}>
             {currentUser?.name || 'No name yet'}
           </Text>
-          {currentUser?.username && (
-            <Text style={{ fontSize: 15, fontWeight: '600', color: colors.primary, marginTop: -8 }}>
-              @{currentUser.username}
+          {currentUser?.username ? (
+            <Text style={{ fontSize: 15, fontWeight: '600', color: colors.primary, marginTop: -8, paddingHorizontal: 4 }}>
+              {`@${currentUser.username}  `}
             </Text>
-          )}
+          ) : null}
           <Text style={{ fontSize: 14, color: colors.textMuted }}>{currentUser?.email}</Text>
           {currentUser?.upiId ? (
             <View

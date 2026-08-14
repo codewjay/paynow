@@ -29,7 +29,7 @@ router.put(
   '/me',
   body('name').optional().isString().trim().isLength({ min: 1, max: 60 }),
   body('upiId').optional().isString().matches(/^[\w.\-]+@[\w]+$/).withMessage('UPI ID must look like name@bank'),
-  body('username').optional().isString().trim().toLowerCase().matches(/^[a-z0-9_.-]{3,20}$/).withMessage('Username must be 3-20 chars (letters, numbers, _, ., -)'),
+  body('username').optional().isString().trim().toLowerCase().matches(/^[a-z0-9_.-]{3,15}$/).withMessage('Username must be 3-15 chars (letters, numbers, _, ., -)'),
   body('fcmToken').optional().isString().isLength({ max: 500 }),
   async (req, res, next) => {
     if (handleValidation(req, res)) return;

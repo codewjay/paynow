@@ -17,7 +17,7 @@ const UserSchema = new mongoose.Schema(
       unique: true,
       index: true,
       lowercase: true,
-      match: /^[a-z0-9_.-]{3,20}$/,
+      match: /^[a-z0-9_.-]{3,15}$/,
     },
     name: { type: String, default: '' },
     upiId: { type: String, default: '', match: /^([\w.\-]+@[\w]+)?$/ },
