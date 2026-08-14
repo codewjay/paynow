@@ -63,7 +63,7 @@ export const authApi = {
 export const userApi = {
   me: () => api.get('/api/users/me').then((r) => r.data.user),
   update: (patch) => api.put('/api/users/me', patch).then((r) => r.data.user),
-  search: (email) => api.get('/api/users/search', { params: { email } }).then((r) => r.data.user),
+  search: (q) => api.get('/api/users/search', { params: { q } }).then((r) => r.data.user),
   addFriend: (userId) => api.post(`/api/users/friends/${userId}`).then((r) => r.data.friend),
   friends: () => api.get('/api/users/friends').then((r) => r.data.friends),
   deleteMe: () => api.delete('/api/users/me').then((r) => r.data),

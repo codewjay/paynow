@@ -31,7 +31,9 @@ export default function AddFriendScreen({ navigation, route }) {
       const u = await userApi.search(query.toLowerCase().trim());
       setFound(u);
     } catch (err) {
-      setError(errorMessage(err, 'No user found'));
+      const searchTerm = query.toLowerCase().trim();
+      const isEmail = searchTerm.includes('@');
+      setError(errorMessage(err, isEmail ? `No user found with email "${searchTerm}"` : `No user found with username "${searchTerm}"`));
     } finally {
       setSearching(false);
     }

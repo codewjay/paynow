@@ -67,7 +67,7 @@ router.get(
         isDeleted: false 
       });
       if (!user || user._id.equals(req.user._id)) {
-        return res.status(404).json({ error: 'No user found' });
+        return res.status(404).json({ error: 'No user found with that email or username' });
       }
       res.json({ user: user.toPublicJSON() });
     } catch (err) {
