@@ -16,7 +16,7 @@ export default function ProfileSetupScreen() {
   const [error, setError] = useState('');
 
   const usernameOk = /^[a-z0-9_.-]{3,15}$/.test(username);
-  const ready = name.trim().length >= 1 && usernameOk && (!upiId || isValidUPI(upiId.trim()));
+  const ready = name.trim().length >= 1 && usernameOk && isValidUPI(upiId.trim());
 
   const submit = async () => {
     if (!ready) return;

@@ -27,7 +27,7 @@ export default function EditProfileScreen({ navigation }) {
 
   const usernameOk = /^[a-z0-9_.-]{3,15}$/.test(username);
   const nameOk = name.trim().length > 0;
-  const upiOk = !upiId || /^[\w.-]+@[\w.-]+$/.test(upiId);
+  const upiOk = /^[\w.-]+@[\w.-]+$/.test(upiId);
   
   const dirty = name !== (currentUser?.name || '') || 
                 username !== (currentUser?.username || '') || 
@@ -101,7 +101,7 @@ export default function EditProfileScreen({ navigation }) {
             Friends can use this to find you instead of your email.
           </Text>
 
-          <SectionLabel>UPI ID (Optional)</SectionLabel>
+          <SectionLabel>UPI ID</SectionLabel>
           <View style={inputWrapperStyle}>
             <TextInput
               defaultValue={upiIdRef.current}
